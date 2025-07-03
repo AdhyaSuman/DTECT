@@ -3,7 +3,6 @@
   <img src="https://github.com/AdhyaSuman/DTECT/blob/main/assets/Logo_light.png" width="400"/>
 </p>
 
------
 
 ## 👋 Introduction
 
