@@ -169,26 +169,25 @@ We list below the datasets, codebases, and evaluation resources referenced or in
 
 #### Datasets
 
-  * **ACL Anthology:** [https://aclanthology.org/](https://aclanthology.org/)
-  * **UN General Debates:** [https://www.kaggle.com/datasets/unitednations/un-general-debates](https://www.kaggle.com/datasets/unitednations/un-general-debates)
-  * **TCPD-IPD Finance:** [https://tcpd.ashoka.edu.in/question-hour/](https://tcpd.ashoka.edu.in/question-hour/)
+- [ACL Anthology](https://aclanthology.org/)
+- [UN General Debates](https://www.kaggle.com/datasets/unitednations/un-general-debates)
+- [TCPD-IPD Finance](https://tcpd.ashoka.edu.in/question-hour/)
 
 #### Dynamic Topic Modeling Codebases
 
-  * **TopMost Toolkit:** [https://github.com/bobxwu/TopMost](https://github.com/bobxwu/TopMost)
-  * **DTM Implementation:** [https://github.com/bobxwu/TopMost/blob/main/topmost/trainers/dynamic/DTM\_trainer.py](https://github.com/bobxwu/TopMost/blob/main/topmost/trainers/dynamic/DTM_trainer.py)
-  * **DETM Implementation:** [https://github.com/bobxwu/TopMost/blob/main/topmost/models/dynamic/DETM.py](https://github.com/bobxwu/TopMost/blob/main/topmost/models/dynamic/DETM.py)
-  * **CFDTM Implementation:** [https://github.com/bobxwu/TopMost/tree/main/topmost/models/dynamic/CFDTM](https://github.com/bobxwu/TopMost/tree/main/topmost/models/dynamic/CFDTM)
+- [DTM Trainer](https://github.com/bobxwu/TopMost/blob/main/topmost/trainers/dynamic/DTM_trainer.py)
+- [DETM Model](https://github.com/bobxwu/TopMost/blob/main/topmost/models/dynamic/DETM.py)
+- [CFDTM Model](https://github.com/bobxwu/TopMost/tree/main/topmost/models/dynamic/CFDTM)
 
 #### Preprocessing Toolkit
 
-  * **OCTIS:** [https://github.com/MIND-Lab/OCTIS](https://github.com/MIND-Lab/OCTIS)
+- [OCTIS](https://github.com/MIND-Lab/OCTIS)
 
 #### Evaluation Metrics
 
   * **Evaluating Dynamic Topic Models:** [https://github.com/CharuJames/Evaluating-Dynamic-Topic-Models](https://github.com/CharuJames/Evaluating-Dynamic-Topic-Models)
 
------
+---
 
 ## 🙏 Acknowledgements
 
@@ -196,3 +195,5 @@ We would like to acknowledge the following open-source projects that were instru
 
 1.  **TopMost Toolkit:** [https://github.com/bobxwu/TopMost](https://github.com/bobxwu/TopMost)
 2.  **OCTIS:** [https://github.com/MIND-Lab/OCTIS](https://github.com/MIND-Lab/OCTIS)
+
+---
