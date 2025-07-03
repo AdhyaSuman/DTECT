@@ -175,9 +175,9 @@ We list below the datasets, codebases, and evaluation resources referenced or in
 
 #### Dynamic Topic Modeling Codebases
 
-- [DTM Trainer](https://github.com/bobxwu/TopMost/blob/main/topmost/trainers/dynamic/DTM_trainer.py)
-- [DETM Model](https://github.com/bobxwu/TopMost/blob/main/topmost/models/dynamic/DETM.py)
-- [CFDTM Model](https://github.com/bobxwu/TopMost/tree/main/topmost/models/dynamic/CFDTM)
+- [DTM](https://github.com/bobxwu/TopMost/blob/main/topmost/trainers/dynamic/DTM_trainer.py)
+- [DETM](https://github.com/bobxwu/TopMost/blob/main/topmost/models/dynamic/DETM.py)
+- [CFDTM](https://github.com/bobxwu/TopMost/tree/main/topmost/models/dynamic/CFDTM)
 
 #### Preprocessing Toolkit
 
