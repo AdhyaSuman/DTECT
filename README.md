@@ -91,8 +91,7 @@ assessor = TopicQualityAssessor(
 )
 summary = assessor.get_dtq_summary()
 ```
-
------
+---
 
 ## 📁 Repository Structure
 
@@ -100,61 +99,15 @@ summary = assessor.get_dtq_summary()
 ├── app
 │   └── ui.py
 ├── assets
-│   ├── Logo_dark.png
-│   └── Logo_light.png
 ├── backend
 │   ├── datasets
-│   │   ├── data
-│   │   │   ├── download.py
-│   │   │   └── file_utils.py
-│   │   ├── dynamic_dataset.py
-│   │   ├── preprocess.py
-│   │   └── utils
-│   │       ├── logger.py
-│   │       └── _utils.py
 │   ├── evaluation
-│   │   ├── CoherenceModel_ttc.py
-│   │   ├── eval.py
-│   │   ├── topic_coherence.py
-│   │   └── topic_diversity.py
 │   ├── inference
-│   │   ├── doc_retriever.py
-│   │   ├── indexing_utils.py
-│   │   ├── peak_detector.py
-│   │   ├── process_beta.py
-│   │   └── word_selector.py
-│   ├── __init__.py
 │   ├── llm
-│   │   ├── custom_gemini.py
-│   │   ├── custom_mistral.py
-│   │   └── llm_router.py
 │   ├── llm_utils
-│   │   ├── label_generator.py
-│   │   ├── summarizer.py
-│   │   └── token_utils.py
 │   └── models
-│       ├── CFDTM
-│       │   ├── CFDTM.py
-│       │   ├── Encoder.py
-│       │   ├── ETC.py
-│       │   ├── __init__.py
-│       │   └── UWE.py
-│       ├── DETM.py
-│       ├── DTM_trainer.py
-│       └── dynamic_trainer.py
 ├── data
 │   └── Sample_data
-│       ├── CFDTM
-│       │   └── beta.npy
-│       ├── docs.jsonl
-│       └── processed
-│           ├── length_stats.json
-│           ├── time2id.txt
-│           ├── train_bow.npz
-│           ├── train_texts.txt
-│           ├── train_times.txt
-│           ├── vocab.txt
-│           └── word_embeddings.npz
 ├── environment.yml
 ├── LICENSE
 ├── main.py
@@ -193,7 +146,14 @@ We list below the datasets, codebases, and evaluation resources referenced or in
 
 We would like to acknowledge the following open-source projects that were instrumental in the development of DTECT:
 
-1.  **TopMost Toolkit:** [https://github.com/bobxwu/TopMost](https://github.com/bobxwu/TopMost)
-2.  **OCTIS:** [https://github.com/MIND-Lab/OCTIS](https://github.com/MIND-Lab/OCTIS)
+> 🔍 **TopMost Toolkit**
+> [https://github.com/bobxwu/TopMost](https://github.com/bobxwu/TopMost)
+> 📌 **Reference:** Xiaobao Wu, Fengjun Pan, and Anh Tuan Luu. 2024. Towards the TopMost: A Topic Modeling System Toolkit. In Proceedings of the 62nd Annual Meeting of the Association for Computational Linguistics (Volume 3: System Demonstrations), pages 31–41, Bangkok, Thailand. Association for Computational Linguistics.
+
+<br>
+
+> 📦 **OCTIS**
+> [https://github.com/MIND-Lab/OCTIS](https://github.com/MIND-Lab/OCTIS)
+> 📌 Silvia Terragni, Elisabetta Fersini, Bruno Giovanni Galuzzi, Pietro Tropeano, and Antonio Candelieri. 2021. OCTIS: Comparing and Optimizing Topic models is Simple!. In Proceedings of the 16th Conference of the European Chapter of the Association for Computational Linguistics: System Demonstrations, pages 263–270, Online. Association for Computational Linguistics.
 
 ---
