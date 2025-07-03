@@ -1,0 +1,27 @@
+name: dtect
+channels:
+  - defaults
+  - conda-forge
+  - pytorch
+dependencies:
+  - python=3.9
+  - pip
+  - pip:
+      - anthropic==0.55.0
+      - faiss-cpu==1.11.0
+      - gensim==3.8.3
+      - langchain==0.3.26
+      - langchain-community==0.3.26
+      - langchain-core==0.3.66
+      - langchain-google-genai==2.1.5
+      - langchain-openai==0.3.25
+      - octis==1.14.0
+      - plotly==6.1.2
+      - scikit-learn==1.1.0
+      - scipy==1.10.1
+      - sentence-transformers==4.1.0
+      - streamlit==1.46.0
+      - tiktoken==0.9.0
+      - torch==2.7.1
+      - torchvision==0.22.1
+
