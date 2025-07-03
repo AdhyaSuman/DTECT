@@ -154,5 +154,3 @@ We would like to acknowledge the following open-source projects that were instru
 > 📦 **OCTIS**
 > [https://github.com/MIND-Lab/OCTIS](https://github.com/MIND-Lab/OCTIS)
 > 📌 Silvia Terragni, Elisabetta Fersini, Bruno Giovanni Galuzzi, Pietro Tropeano, and Antonio Candelieri. 2021. OCTIS: Comparing and Optimizing Topic models is Simple!. In Proceedings of the 16th Conference of the European Chapter of the Association for Computational Linguistics: System Demonstrations, pages 263–270, Online. Association for Computational Linguistics.
-
----
