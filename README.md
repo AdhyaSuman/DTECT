@@ -154,3 +154,15 @@ We would like to acknowledge the following open-source projects that were instru
 > 📦 **OCTIS**
 > [https://github.com/MIND-Lab/OCTIS](https://github.com/MIND-Lab/OCTIS)
 > 📌 Silvia Terragni, Elisabetta Fersini, Bruno Giovanni Galuzzi, Pietro Tropeano, and Antonio Candelieri. 2021. OCTIS: Comparing and Optimizing Topic models is Simple!. In Proceedings of the 16th Conference of the European Chapter of the Association for Computational Linguistics: System Demonstrations, pages 263–270, Online. Association for Computational Linguistics.
+
+### 📌 BibTeX
+```bibtex
+@misc{adhya2025dtect,
+      title={{DTECT}: Dynamic Topic Explorer & Context Tracker}, 
+      author={Suman Adhya and Debarshi Kumar Sanyal},
+      year={2025},
+      eprint={2507.07910},
+      archivePrefix={arXiv},
+      primaryClass={cs.CL},
+      url={https://arxiv.org/abs/2507.07910}, 
+}
