@@ -147,13 +147,13 @@ We would like to acknowledge the following open-source projects that were instru
 
 > 🔍 **TopMost Toolkit**
 > [https://github.com/bobxwu/TopMost](https://github.com/bobxwu/TopMost)
-> 📌 **Reference:** Xiaobao Wu, Fengjun Pan, and Anh Tuan Luu. 2024. Towards the TopMost: A Topic Modeling System Toolkit. In Proceedings of the 62nd Annual Meeting of the Association for Computational Linguistics (Volume 3: System Demonstrations), pages 31–41, Bangkok, Thailand. Association for Computational Linguistics.
+> 📌 **Reference:** Xiaobao Wu, Fengjun Pan, and Anh Tuan Luu. 2024. *Towards the TopMost: A Topic Modeling System Toolkit*. In Proceedings of the 62nd Annual Meeting of the Association for Computational Linguistics (Volume 3: System Demonstrations), pages 31–41, Bangkok, Thailand. Association for Computational Linguistics.
 
 <br>
 
 > 📦 **OCTIS**
 > [https://github.com/MIND-Lab/OCTIS](https://github.com/MIND-Lab/OCTIS)
-> 📌 Silvia Terragni, Elisabetta Fersini, Bruno Giovanni Galuzzi, Pietro Tropeano, and Antonio Candelieri. 2021. OCTIS: Comparing and Optimizing Topic models is Simple!. In Proceedings of the 16th Conference of the European Chapter of the Association for Computational Linguistics: System Demonstrations, pages 263–270, Online. Association for Computational Linguistics.
+> 📌 **Reference:** Silvia Terragni, Elisabetta Fersini, Bruno Giovanni Galuzzi, Pietro Tropeano, and Antonio Candelieri. 2021. *OCTIS: Comparing and Optimizing Topic Models is Simple!*. In Proceedings of the 16th Conference of the European Chapter of the Association for Computational Linguistics: System Demonstrations, pages 263–270, Online. Association for Computational Linguistics.
 
 ### 📌 BibTeX
 ```bibtex
