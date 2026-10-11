@@ -56,6 +56,7 @@ from .models.DETM import DETM
 from .models.DTM_trainer import DTMTrainer
 from .models.CFDTM.CFDTM import CFDTM
 from .models.dynamic_trainer import DynamicTrainer
+from .models.BERTopic_trainer import BERTopicTrainer
 
 __all__ = [
     # Inference
@@ -77,5 +78,5 @@ __all__ = [
     "CoherenceModel_ttc", "TopicQualityAssessor",
 
     # Models
-    "DETM", "DTMTrainer", "CFDTM", "DynamicTrainer"
+    "DETM", "DTMTrainer", "CFDTM", "DynamicTrainer", "BERTopicTrainer"
 ]
