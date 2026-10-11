@@ -65,7 +65,7 @@ st.sidebar.markdown(
 # 1. Sidebar: Model and Dataset Selection
 st.sidebar.title("Configuration")
 
-AVAILABLE_MODELS = ["DTM", "DETM", "CFDTM"]
+AVAILABLE_MODELS = ["DTM", "DETM", "CFDTM", "BERTopic"]
 ENV_VAR_MAP = {
     "OpenAI": "OPENAI_API_KEY",
     "Anthropic": "ANTHROPIC_API_KEY",
@@ -81,7 +81,15 @@ def list_datasets(data_dir):
 with st.sidebar.expander("Select Dataset & Topic Model", expanded=True):
     datasets = list_datasets(DATA_DIR)
     selected_dataset = st.selectbox("Dataset", datasets, help="Choose an available dataset.")
-    selected_model = st.selectbox("Model", AVAILABLE_MODELS, help="Select topic model architecture.")
+    # Only offer models that have been trained for this dataset (i.e. have a beta.npy)
+    trained_models = [
+        m for m in AVAILABLE_MODELS
+        if os.path.isfile(os.path.join(DATA_DIR, selected_dataset, m, "beta.npy"))
+    ]
+    if not trained_models:
+        st.error(f"No trained model (beta.npy) found for dataset '{selected_dataset}'.")
+        st.stop()
+    selected_model = st.selectbox("Model", trained_models, help="Select topic model architecture.")
 
 # Check if the dataset has changed and reset session state if it has.
 if 'current_dataset' not in st.session_state or st.session_state.current_dataset != selected_dataset:
