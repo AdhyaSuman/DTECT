@@ -11,20 +11,34 @@ timestamp. DTECT needs a full temporal topic-word tensor beta (T x K x V),
 so this trainer repeats the same per-timestamp computation over the full
 DTECT vocabulary:
 
-  1. c-TF-IDF of each topic at time t, using the IDF learned on the full corpus
-  2. L1-normalise each topic row
-  3. evolution tuning (optional, off by default): average row t with row t-1
-     (topics present at both t-1 and t)
-  4. global tuning: average with the topic's global (all-time) c-TF-IDF
+  1. c-TF-IDF of each topic at time t (BERTopic's own `_c_tf_idf(fit=False)`,
+     i.e. the fitted vectorizer and the IDF learned on the full corpus)
+  2. if global_tuning or evolution_tuning: L1-normalise each topic row
+  3. evolution tuning: average row t with the previous timestamp's row
+     (topics present at both) -- see note below
+  4. global tuning: average with the topic's L1-normalised global c-TF-IDF
+     row (the fitted `c_tf_idf_`)
   5. renormalise rows to sum to 1, so beta[t, k] is a distribution over V
+     (does not change the word ranking)
 
-Topics with no documents at time t take their row from t-1
-(or the global row at t = 0).
+Defaults mirror `BERTopic.topics_over_time` in the installed BERTopic (0.17.4):
+global_tuning=True, evolution_tuning=True. In that version the evolution-tuning
+step assigns into a temporary `.tolil()` copy of the matrix
+(`c_tf_idf.tolil()[idx] = ...`) and therefore has no effect. To mirror that
+behaviour exactly, evolution tuning is a no-op unless
+`evolution_tuning_effective=True`, which applies the averaging the BERTopic
+docs describe. `check_against_topics_over_time()` verifies beta's top words
+against BERTopic's own output.
 
-evolution_tuning defaults to False: in BERTopic (checked up to 0.17.4) the
-evolution-tuning assignment in `topics_over_time` writes into a temporary
-`.tolil()` copy and has no effect, so with the default settings beta's top
-words match BERTopic's own `topics_over_time(global_tuning=True)`.
+A (topic, time) cell with no documents takes the topic's global (all-time)
+c-TF-IDF row; the number of such cells is stored in `self.empty_cells_`.
+
+Embeddings: documents are embedded from their raw text (`raw_texts`, aligned
+with dataset.train_texts); the preprocessed train_texts are only used for the
+c-TF-IDF word counts. Documents longer than the encoder's max_seq_length are
+split into token chunks, each chunk is embedded and the chunk embeddings are
+mean-pooled per document. Without `raw_texts`, train_texts are embedded.
+
 """
 
 import numpy as np
@@ -47,8 +61,10 @@ class BERTopicTrainer:
                  embedding_model="sentence-transformers/all-MiniLM-L6-v2",
                  clustering="kmeans",          # "kmeans" (fixed K) or "hdbscan" (BERTopic default)
                  min_topic_size=10,            # only used with hdbscan
-                 global_tuning=True,
-                 evolution_tuning=False,      # see module docstring
+                 global_tuning=True,          # BERTopic topics_over_time default
+                 evolution_tuning=True,       # BERTopic topics_over_time default (no-op, see docstring)
+                 evolution_tuning_effective=False,
+                 raw_texts=None,              # raw text per train doc (for embeddings)
                  umap_n_neighbors=15,
                  umap_n_components=5,
                  embedding_batch_size=64,
@@ -64,15 +80,20 @@ class BERTopicTrainer:
         self.min_topic_size = min_topic_size
         self.global_tuning = global_tuning
         self.evolution_tuning = evolution_tuning
+        self.evolution_tuning_effective = evolution_tuning_effective
         self.umap_n_neighbors = umap_n_neighbors
         self.umap_n_components = umap_n_components
         self.embedding_batch_size = embedding_batch_size
         self.seed = seed
+        self.raw_texts = raw_texts
         self.verbose = verbose
         logger.set_level("DEBUG" if verbose else "WARNING")
 
         self.model = None
         self.beta = None
+        self._encoder = None
+        self.empty_cells_ = None
+        self.chunk_stats_ = None
 
     # ------------------------------------------------------------------ #
     # Training
@@ -83,14 +104,22 @@ class BERTopicTrainer:
         times = times.cpu().numpy() if hasattr(times, "cpu") else np.asarray(times)
         return docs, times.astype(int)
 
-    def _build_model(self):
-        from bertopic import BERTopic
+    def _make_umap(self):
         from umap import UMAP
+        return UMAP(n_neighbors=self.umap_n_neighbors,
+                    n_components=self.umap_n_components,
+                    min_dist=0.0, metric="cosine",
+                    random_state=self.seed)
 
-        umap_model = UMAP(n_neighbors=self.umap_n_neighbors,
-                          n_components=self.umap_n_components,
-                          min_dist=0.0, metric="cosine",
-                          random_state=self.seed)
+    def _build_model(self, precomputed_reduction=False):
+        from bertopic import BERTopic
+
+        if precomputed_reduction:
+            # embeddings passed to fit_transform are already UMAP-reduced
+            from bertopic.dimensionality import BaseDimensionalityReduction
+            umap_model = BaseDimensionalityReduction()
+        else:
+            umap_model = self._make_umap()
 
         if self.clustering == "kmeans":
             cluster_model = KMeans(n_clusters=self.num_topics, random_state=self.seed, n_init=10)
@@ -117,17 +146,94 @@ class BERTopicTrainer:
                         calculate_probabilities=False,
                         verbose=self.verbose)
 
-    def train(self, embeddings=None):
-        """Fit BERTopic and build beta. `embeddings` (N x d) can be passed to skip encoding."""
-        docs, times = self._docs_and_times()
-        self._encoder = None
-        if embeddings is None:
+    def _load_encoder(self, device=None):
+        if self._encoder is None:
             from sentence_transformers import SentenceTransformer
-            self._encoder = SentenceTransformer(self.embedding_model)
-            embeddings = self._encoder.encode(docs, batch_size=self.embedding_batch_size,
-                                              show_progress_bar=self.verbose)
-        self.model = self._build_model()
-        topics, _ = self.model.fit_transform(docs, embeddings=embeddings)
+            self._encoder = SentenceTransformer(self.embedding_model, device=device)
+        return self._encoder
+
+    def _chunk(self, text, tokenizer, max_tokens):
+        """Split `text` into character spans of <= max_tokens wordpiece tokens,
+        cutting only at word starts (not inside '##' continuation pieces)."""
+        enc = tokenizer(text, add_special_tokens=False, return_offsets_mapping=True,
+                        truncation=False, verbose=False)
+        offsets, ids = enc["offset_mapping"], enc["input_ids"]
+        if len(ids) <= max_tokens:
+            return [text]
+        pieces = tokenizer.convert_ids_to_tokens(ids)
+        chunks, start = [], 0
+        while start < len(ids):
+            end = min(start + max_tokens, len(ids))
+            if end < len(ids):
+                back = end
+                while back > start + max_tokens // 2 and pieces[back].startswith("##"):
+                    back -= 1
+                end = back
+            chunks.append(text[offsets[start][0]:offsets[end - 1][1]])
+            start = end
+        return chunks
+
+    def embed(self, texts=None, device=None):
+        """Embed documents (default: raw_texts, else train_texts) with chunking + mean pooling.
+
+        Each document is split into chunks of at most (max_seq_length - 2 - 8) wordpiece
+        tokens (special tokens + safety margin), all chunks are encoded, and the chunk
+        embeddings of a document are averaged (unweighted mean).
+        """
+        if texts is None:
+            texts = self.raw_texts if self.raw_texts is not None else list(self.dataset.train_texts)
+        enc = self._load_encoder(device)
+        tok = enc.tokenizer
+        max_tokens = enc.max_seq_length - 2 - 8
+
+        chunks, owner = [], []
+        for d, text in enumerate(texts):
+            cs = [c for c in self._chunk(text or "", tok, max_tokens) if c.strip()] or [text or ""]
+            chunks.extend(cs)
+            owner.extend([d] * len(cs))
+        owner = np.asarray(owner)
+
+        chunk_emb = enc.encode(chunks, batch_size=self.embedding_batch_size,
+                               show_progress_bar=self.verbose, convert_to_numpy=True)
+        n_docs = len(texts)
+        counts = np.bincount(owner, minlength=n_docs)
+        doc_emb = np.zeros((n_docs, chunk_emb.shape[1]), dtype=np.float64)
+        np.add.at(doc_emb, owner, chunk_emb)
+        doc_emb = (doc_emb / counts[:, None]).astype(np.float32)
+
+        self.chunk_stats_ = {
+            "encoder": self.embedding_model,
+            "max_seq_length": int(enc.max_seq_length),
+            "chunk_max_tokens": int(max_tokens),
+            "n_docs": int(n_docs),
+            "n_chunks": int(len(chunks)),
+            "n_docs_chunked": int((counts > 1).sum()),
+            "chunks_per_doc_mean": float(counts.mean()),
+            "chunks_per_doc_max": int(counts.max()),
+            "pooling": "mean",
+        }
+        return doc_emb
+
+    def reduce(self, embeddings):
+        """UMAP reduction (seeded); reuse the result across several K via train(reduced_embeddings=...)."""
+        return self._make_umap().fit_transform(embeddings)
+
+    def train(self, embeddings=None, reduced_embeddings=None):
+        """Fit BERTopic and build beta.
+
+        embeddings:         (N x d) document embeddings; computed with `embed()` if None.
+        reduced_embeddings: (N x umap_n_components) precomputed UMAP output; if given,
+                            UMAP is skipped and `embeddings` is not needed.
+        """
+        docs, times = self._docs_and_times()
+        if reduced_embeddings is not None:
+            self.model = self._build_model(precomputed_reduction=True)
+            topics, _ = self.model.fit_transform(docs, embeddings=reduced_embeddings)
+        else:
+            if embeddings is None:
+                embeddings = self.embed()
+            self.model = self._build_model()
+            topics, _ = self.model.fit_transform(docs, embeddings=embeddings)
         self.topics_ = np.asarray(topics)
 
         self.beta = self._compute_beta(docs, times, self.topics_)
@@ -136,51 +242,102 @@ class BERTopicTrainer:
     # ------------------------------------------------------------------ #
     # beta (T x K x V)
     # ------------------------------------------------------------------ #
-    def _ctfidf(self, docs_per_topic):
-        """c-TF-IDF of already-joined topic documents, using the fitted IDF."""
-        X = self.model.vectorizer_model.transform(docs_per_topic)
-        return self.model.ctfidf_model.transform(X)
-
     def _compute_beta(self, docs, times, topics):
+        """beta[t, k] mirroring BERTopic.topics_over_time (see module docstring)."""
+        m = self.model
         df = pd.DataFrame({"Document": docs, "Topic": topics, "Time": times})
-        df = df[df.Topic != -1]                      # drop HDBSCAN outliers
-        topic_ids = sorted(df.Topic.unique())        # K real topics
-        K, V, T = len(topic_ids), len(self.vocab), self.dataset.num_times
-        row_of = {t: i for i, t in enumerate(topic_ids)}
 
-        # Global c-TF-IDF per topic (all timestamps)
-        glob = df.groupby("Topic")["Document"].apply(" ".join)
-        global_ctfidf = normalize(self._ctfidf(glob.loc[topic_ids].tolist()), norm="l1", axis=1).toarray()
+        # As in topics_over_time: global rows = L1-normalised fitted c_tf_idf_, indexed by the
+        # position of the topic among the sorted unique topics (outlier -1 included if present).
+        global_all = normalize(m.c_tf_idf_, axis=1, norm="l1", copy=True).toarray()
+        all_topics = sorted(df.Topic.unique())
+        all_idx = {k: i for i, k in enumerate(all_topics)}
+
+        topic_ids = [k for k in all_topics if k != -1]        # K real topics (-1: HDBSCAN outliers)
+        K, V, T = len(topic_ids), len(self.vocab), self.dataset.num_times
+        row_of = {k: i for i, k in enumerate(topic_ids)}
+        global_rows = global_all[[all_idx[k] for k in topic_ids]]
 
         beta = np.zeros((T, K, V), dtype=np.float64)
-        prev_present = np.zeros(K, dtype=bool)
+        empty = np.ones((T, K), dtype=bool)
+        prev = None                                           # (topic ids, rows) of previous timestamp
         for t in range(T):
-            sel = df[df.Time == t]
-            present = np.zeros(K, dtype=bool)
-            if len(sel):
-                per_topic = sel.groupby("Topic")["Document"].apply(" ".join)
-                rows = [row_of[k] for k in per_topic.index]
-                c = normalize(self._ctfidf(per_topic.tolist()), norm="l1", axis=1).toarray()
+            sel = df[(df.Time == t) & (df.Topic != -1)]
+            if len(sel):                                      # timestamps without documents are skipped,
+                per_topic = (sel.groupby(["Topic"], as_index=False)   # as in topics_over_time
+                                .agg({"Document": " ".join}))
+                c, _ = m._c_tf_idf(per_topic, fit=False)      # same preprocessing/vectorizer/IDF as BERTopic
+                if self.global_tuning or self.evolution_tuning:
+                    c = normalize(c, axis=1, norm="l1", copy=False)
+                c = c.toarray()
+                cur = list(per_topic.Topic.values)
+
+                if self.evolution_tuning and prev is not None and self.evolution_tuning_effective:
+                    prev_ids, prev_rows = prev
+                    overlap = sorted(set(prev_ids) & set(cur))
+                    ci = [cur.index(k) for k in overlap]
+                    pi = [prev_ids.index(k) for k in overlap]
+                    c[ci] = (c[ci] + prev_rows[pi]) / 2.0
+                # else: BERTopic <= 0.17.4 assigns into a temporary .tolil() copy -> no effect
+
+                if self.global_tuning:
+                    c = (global_all[[all_idx[k] for k in cur]] + c) / 2.0
+
+                rows = [row_of[k] for k in cur]
                 beta[t, rows] = c
-                present[rows] = True
+                empty[t, rows] = False
+                if self.evolution_tuning:
+                    prev = (cur, c.copy())
 
-            # topics with no documents at time t
-            fallback = beta[t - 1] if t > 0 else global_ctfidf
-            beta[t, ~present] = fallback[~present]
+            # (topic, time) cells without documents: the topic's global c-TF-IDF row
+            beta[t, empty[t]] = global_rows[empty[t]]
 
-            if self.evolution_tuning and t > 0:
-                both = present & prev_present          # as in BERTopic: only topics seen at t-1 and t
-                beta[t, both] = (beta[t, both] + beta[t - 1, both]) / 2.0
-            if self.global_tuning:
-                beta[t, present] = (beta[t, present] + global_ctfidf[present]) / 2.0
-            prev_present = present
-
-        # Each row becomes a distribution over the vocabulary
+        # Each row becomes a distribution over the vocabulary (without tuning, BERTopic's
+        # per-time rows are not L1-normalised; normalising does not change the word ranking)
         sums = beta.sum(-1, keepdims=True)
         sums[sums == 0] = 1.0
         beta = beta / sums
         self.topic_ids = topic_ids
+        self.empty_cells_ = {
+            "n_empty_cells": int(empty.sum()),
+            "n_cells": int(T * K),
+            "fraction": float(empty.mean()) if T * K else 0.0,
+            "per_time": empty.sum(1).astype(int).tolist(),
+            "per_topic": empty.sum(0).astype(int).tolist(),
+        }
         return beta.astype(np.float32)
+
+    def check_against_topics_over_time(self, docs=None, times=None, n_words=5):
+        """Compare beta's top words with BERTopic's own topics_over_time (same tuning flags).
+
+        Returns the fraction of non-empty (topic, time) cells whose top-`n_words` list is identical
+        (ordered), identical as a set, and identical up to ties (the beta values at the two lists'
+        positions agree, i.e. differences only come from ordering words with equal scores). Only meaningful for the BERTopic-default flags or
+        evolution_tuning_effective=False, because that is what topics_over_time computes.
+        """
+        if docs is None:
+            docs, times = self._docs_and_times()
+        tot = self.model.topics_over_time(docs, list(np.asarray(times).astype(int)),
+                                          evolution_tuning=self.evolution_tuning,
+                                          global_tuning=self.global_tuning)
+        row_of = {k: i for i, k in enumerate(self.topic_ids)}
+        vidx = {w: i for i, w in enumerate(self.vocab)}
+        n = same_order = same_set = up_to_ties = 0
+        for r in tot.itertuples():
+            if r.Topic not in row_of:
+                continue
+            ref = [w.strip() for w in r.Words.split(",")][:n_words]
+            b = self.beta[int(r.Timestamp), row_of[r.Topic]].astype(np.float64)
+            top = np.argsort(-b, kind="stable")[:n_words]
+            ours = [self.vocab[i] for i in top]
+            n += 1
+            same_order += ours == ref
+            same_set += set(ours) == set(ref)
+            up_to_ties += (ours == ref) or (all(w in vidx for w in ref) and np.allclose(
+                np.sort(b[[vidx[w] for w in ref]]), np.sort(b[top]), rtol=1e-5, atol=1e-9))
+        return {"n_cells": n, "top_words": n_words,
+                "identical_order": same_order / max(n, 1), "identical_set": same_set / max(n, 1),
+                "identical_up_to_ties": up_to_ties / max(n, 1)}
 
     # ------------------------------------------------------------------ #
     # Same interface as the other DTECT trainers
